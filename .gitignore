@@ -1,0 +1,40 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment & secrets
+.env
+.env.*
+*.env
+!*.env.example
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!terraform.tfvars.example
+.terraform/
+.terraform.lock.hcl.backup
+crash.log
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
