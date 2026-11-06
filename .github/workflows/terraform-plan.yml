@@ -1,0 +1,40 @@
+name: Terraform Plan
+
+on:
+  pull_request:
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform-plan.yml"
+  workflow_dispatch:
+
+jobs:
+  plan:
+    name: Lint & Plan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_version: "1.17.1"
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive terraform/
+
+      - name: Validate and Plan Staging
+        run: |
+          cd terraform/envs/staging
+          cp terraform.tfvars.example terraform.tfvars
+          terraform init
+          terraform validate
+          terraform plan -no-color
+
+      - name: Validate and Plan Production
+        run: |
+          cd terraform/envs/prod
+          cp terraform.tfvars.example terraform.tfvars
+          terraform init
+          terraform validate
+          terraform plan -no-color

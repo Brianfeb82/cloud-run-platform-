@@ -1,0 +1,91 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    name: Test & Build Artifact
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.vars.outputs.image_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5.3.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies & test
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements.txt
+          pytest -v app/tests/
+
+      - name: Set output variables
+        id: vars
+        run: echo "image_tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.8.0
+
+      - name: Build and load image
+        uses: docker/build-push-action@v6.9.0
+        with:
+          context: ./app
+          file: ./app/Dockerfile
+          load: true
+          tags: |
+            cloud-platform-api:${{ github.sha }}
+            cloud-platform-api:test
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.8.0
+
+      - name: Build staging container
+        uses: docker/build-push-action@v6.9.0
+        with:
+          context: ./app
+          file: ./app/Dockerfile
+          load: true
+          tags: cloud-platform-api:test
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_version: "1.17.1"
+
+      - name: Deploy via Terraform
+        run: |
+          cd terraform/envs/staging
+          cp terraform.tfvars.example terraform.tfvars
+          terraform init
+          terraform apply -auto-approve -var="app_version=${{ needs.test-and-build.outputs.image_tag }}"
+
+      - name: Smoke Test Staging Endpoint
+        run: |
+          echo "Waiting for container readiness..."
+          for i in {1..10}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/health || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "Smoke test passed with HTTP 200!"
+              curl -s http://127.0.0.1:8081/
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Smoke test failed: Staging service did not respond with HTTP 200"
+          exit 1
