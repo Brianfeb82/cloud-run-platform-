@@ -1,0 +1,4 @@
+service_name  = "platform-api-staging"
+image         = "cloud-platform-api:test"
+external_port = 8081
+app_version   = "v0.1.0-staging"
